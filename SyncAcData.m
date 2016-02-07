@@ -37,14 +37,14 @@ clear acSettings
 
 ts = 1/fs; % sampling time
 
-MAX = max(Sync);
-MIN = min(Sync);
+MAX = max(Sync(idxft:idxlt));
+MIN = min(Sync(idxft:idxlt));
 AMP = MAX-MIN;
-Sync = (Sync - mean(Sync))/AMP;
-Sync = Sync - max(Sync);
+Sync(idxft:idxlt) = (Sync(idxft:idxlt) - mean(Sync(idxft:idxlt)))/AMP;
+Sync(idxft:idxlt) = Sync(idxft:idxlt) - max(Sync(idxft:idxlt));
 
 figure;
-plot(Time,Sync);hold on
+plot(Time(idxft:idxlt),Sync(idxft:idxlt));hold on
 xlabel('Time (s)');ylabel('Normalized Sync');
 dcmObj = datacursormode;
 set(dcmObj,'UpdateFcn',@NewCallback);
@@ -85,6 +85,13 @@ trigger_time_endraw = Time(idxref2):t_btw_trig:Time(idxlt);
 % adjusted sync, using actual_t_btw_trig
 trigger_time_beg = fliplr(Time(idxref2):-actual_t_btw_trig:Time(idxft));
 trigger_time_end = Time(idxref2):actual_t_btw_trig:Time(idxlt);
+
+% to make sure the real first trigger is not missed.
+ftmismatch = abs(trigger_time_beg(1) - Time(idxft));
+if ftmismatch > 0.5*actual_t_btw_trig 
+    trigger_time_beg = [trigger_time_beg(1) - actual_t_btw_trig trigger_time_beg];
+    fprintf('First trigger added\n\n');
+end
 
 % the sample corresponding to idxref2 is both in "beg" and "end" so we remove it from "beg".
 trigger_timeraw = [trigger_time_begraw(1:end-1) trigger_time_endraw];  % raw sync
@@ -141,4 +148,6 @@ acTime = acTime + trigger_time(1);
 
 
 end
+
+
 
