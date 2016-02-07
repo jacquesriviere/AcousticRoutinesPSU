@@ -5,7 +5,7 @@ clc
 % mechanical data.
 
 % Adjust 'Step' to 1, 2, 3, 4 or 5 before running the program
-Step = '1';
+Step = '5';
 
 % Step = '1' to start and choose the run to analyze (e.g. control file X...).
 % Step = '2' to check that the sync is correct
@@ -48,8 +48,7 @@ SampleFreq   = data(:,10);
 % ----------------------------------------------------------------------------
 
 acousticrun = 'run3'; % select the acoustic run to analyze after adjusting indexes (from figure 1) and the path
-switch acousticrun
-                
+switch acousticrun               
     case 'run3'
         general_ac_path = '/Volumes/DataJRLA/acousticdataPSU/p4473';
         run_ac_path = '/Volumes/DataJRLA/acousticdataPSU/p4473/run3/WF_run3_';
@@ -57,8 +56,15 @@ switch acousticrun
         idxft = 2035291; % pick up the first trigger of the run 
         idxlt = 6088292; % pick up the last trigger of the run 
         idxref1 = 2240095; % pick up a large trigger towards the beginning of the run 
-        idxref2 = 5985892; % pick up a large trigger towards the end of the run 
+        idxref2 = 5985892; % pick up a large trigger towards the end of the run                 
 end
+
+% choose 'absoluteref' to cross-correlate all WFs with the numWFref first ones. 
+% or choose 'relativeref' to cross-correlate each WF with the previous one.
+ref = 'absoluteref';
+% when using 'absoluteref', numWFref is the number of WFs used to build a
+% reference WF. When using 'relativeref', set this parameter to one.
+numWFref = 50; 
 
 % Below, indexes TBD when running the program with step 3
 idxBeg = 850;       % choose the beginning of the WF used for analysis 
@@ -94,17 +100,19 @@ filenamedata = [acousticrun 'ac.mat']; % filename of the mat file
 AcSettingsfile = [general_ac_path '/' runname '.mat'];
 
 % sync data
-[acTime,acRate_adjusted,ts_adjusted,totalnumberoffiles] = SyncAcData(AcSettingsfile,Time,Sync,idxft,idxlt,idxref1,idxref2);
+[acTime,acRate_adjusted,ts_adjusted,totalnumberoffiles] = ...
+    SyncAcData(AcSettingsfile,Time,Sync,idxft,idxlt,idxref1,idxref2);
 if stepoptions.CHECK_SYNC
     break
 end
 
 % process acoustic data (Time Shift, RmsAmp and Max Intercorrelation)
-[MaxInter,TimeShift,RmsAmp,TOF_0,RmsAmpRef,fullWFref] = ProcessAc(AcSettingsfile,run_ac_path,ts_adjusted,totalnumberoffiles,idxBeg,idxEnd,idx_TOF_0,stepoptions);
+[MaxInter,TimeShift,RmsAmp,Amp,TOF_0,RmsAmpRef,AmpRef,fullWFref] = ...
+    ProcessAc(AcSettingsfile,run_ac_path,ts_adjusted,totalnumberoffiles,...
+    idxBeg,idxEnd,idx_TOF_0,stepoptions,ref,numWFref);
 if stepoptions.SHOW_WFref
     break
 end
-
 
 %% save data
 save(filenamedata,...
@@ -113,4 +121,11 @@ save(filenamedata,...
     'fullWFref','idxBeg','idxEnd');                                                           
               
 return
+
+
+
+
+
+
+
 
