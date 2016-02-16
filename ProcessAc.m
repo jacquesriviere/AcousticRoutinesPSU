@@ -1,10 +1,20 @@
 function [MaxInter,TimeShift,RmsAmp,Amp,TOF_0,RmsAmpRef,AmpRef,fullWFref] = ...
-    ProcessAc(Ac_path,run_ac_path,ts,totalnumberoffiles,idxBeg,idxEnd,idx_TOF_0,stepoptions,reference,WFrefnum,threshold)
+    ProcessAc(Ac_path,run_ac_path,ts,totalnumberoffiles,idxBeg,idxEnd,idx_TOF_0, ...
+              stepoptions,reference,NtoStackref,NtoStack,threshold)
 
-% ProcessAc processes acoustic data, i.e., use the first 50 WFs as a
+% ProcessAc processes acoustic data, i.e., stacks the first 'NtoStackref' WFs to use as a
 % reference signal and cross-correlate each WF with this reference to
-% extract a change in time of flight. It also compute the root-mean-square
-% amplitude of each WF.
+% extract a change in time of flight. It also computes the amplitude of
+% each waveform (peak-peak amplitude) and the root-mean-square amplitude of
+% each WF.
+% Waveforms can be stacked to improve SNR by choosing 'NtoStack' larger
+% than 1.
+% When choosing 'absoluteref', each stacked WF is cross-correlated with the
+% first stacked WFs (made of the first NtoStackref waveforms).
+% When choosing 'relativeref', each stacked WF is cross-correlated with the
+% previous stacked WF. When choosing 'absoluteref', the window of interest
+% is shifted by one sample when 'Timeshift' becomes larger than sampling
+% time 'ts'.
 
 % INPUTS
 % Ac_path is the path where pXXXX.mat (containing acoustic settings) can be
@@ -22,11 +32,11 @@ function [MaxInter,TimeShift,RmsAmp,Amp,TOF_0,RmsAmpRef,AmpRef,fullWFref] = ...
 % a baseline time of flight
 % stepoptions is the ouput of the selectstep function
 % reference is set either to 'absoluteref' or 'relativeref'. When using
-% 'absoluteref', each WF is cross-correlated with the first WFrefnum WFs,
-% where WFrefnum is the last input
+% 'absoluteref', each WF is cross-correlated with the first NtoStackref WFs,
+% where NtoStackref is the last input
 % 'relativeref', each WF is the previous WF.
-% WFrefnum is the number of waveforms used to build a reference WF when
-% using 'absoluteref'. When 'relativeref' is used, WFrefnum is set to 1 by
+% NtoStackref is the number of waveforms used to build a reference WF when
+% using 'absoluteref'. When 'relativeref' is used, NtoStackref is set equal to NtoStack by
 % default. 
 % threshold is used to ignore noisy waveforms when using 'relativeref'.
 % TimeShift and RmsAmp values are kept only when MaxInter is above this threshold.
@@ -44,12 +54,12 @@ function [MaxInter,TimeShift,RmsAmp,Amp,TOF_0,RmsAmpRef,AmpRef,fullWFref] = ...
 % RmsAmpRef is the rms amplitude of the reference WF 
 % fullWFref is the reference WF.
 
-if strcmp(reference,'relativeref') && (WFrefnum ~= 1)
-    WFrefnum = 1;
-    warning('The number of reference waveforms when using ''relativeref'' has been set to 1.')    
+if strcmp(reference,'relativeref')
+    NtoStackref = NtoStack;
+    warning('The number of reference waveforms (NtoStackref) when using ''relativeref'' is set equal to ''NtoStack''.')    
 end
 
-if strcmp(reference,'absoluteref') && (WFrefnum ~= 1)
+if strcmp(reference,'absoluteref') && (NtoStackref ~= 1)
     threshold = -1;
     warning('The threshold is set to -1 (i.e., no threshold) when using ''absoluteref''.')    
 end
@@ -67,27 +77,32 @@ fs = 1/ts;                                         % acoustic sampling rate
 clear acSettings
 
 acN = totalnumberoffiles*numWFpfilepCH; % total number of WF per channel
+acN = floor(acN/NtoStack); % total number of stacked WF per channel
+
+% time vector for each waveform
+timeWF = (0:WFlength-1)*ts;
 
 fullWFref = zeros(WFlength,numCH);
 RmsAmpRef = zeros(numCH);
 AmpRef = zeros(numCH);
 
 MaxInter = zeros(acN,numCH);
+tempTimeShift = zeros(acN,numCH); % temporary time shift
 TimeShift = zeros(acN,numCH);
 RmsAmp = zeros(acN,numCH);
 Amp = zeros(acN,numCH);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% build a reference waveform, based on the first WFrefnum WFs.
+% build a reference waveform, based on the first NtoStackref WFs.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % if 'relativeref' is chosen, this reference WF will be used once only to
 % be compared with the next one
 
-kk = 0; % from 0 to WFrefnum - 1
+kk = 0; % from 0 to NtoStackref - 1
 ii = 1; % number of files needed to build the reference WF
-jj = 2; % numWFpfilepCH (starts at 2 to avoid the very first WF)
-while kk < WFrefnum
+jj = 2; % from 1 to numWFpfilepCH (starts at 2 to avoid the very first WF)
+while kk < NtoStackref % number of Reference WFs
     if jj == 1 || (ii == 1 && jj == 2) % open new file if jj = 1 (except for the first file, open new file when jj = 2)
         ACfilename = [run_ac_path num2str(ii) '.ac']; % only the first file is needed to extract the first 50 WF
         fid = fopen(ACfilename,'r');
@@ -108,7 +123,7 @@ while kk < WFrefnum
     kk = kk + 1;
 end
 
-fullWFref = fullWFref/WFrefnum; % average
+fullWFref = fullWFref/NtoStackref; % average
 WFref = fullWFref(idxBeg:idxEnd,:); % part of the WF to be analyzed
 
 for chnum = 1:numCH
@@ -118,10 +133,15 @@ end
 
 figure(3)
 for chnum = 1:numCH
-    subplot(numCH,1,chnum);plot(fullWFref(:,chnum),'r');hold on;grid on
-    subplot(numCH,1,chnum);plot(idxBeg:idxEnd,WFref(:,chnum),'g');
-    subplot(numCH,1,chnum);plot(idx_TOF_0,fullWFref(idx_TOF_0,chnum),'sk');hold off
+    subplot(numCH,1,chnum);plot(timeWF*1e6,fullWFref(:,chnum),'r');hold on;grid on
+    subplot(numCH,1,chnum);plot(timeWF(idxBeg:idxEnd)*1e6,WFref(:,chnum),'g');
+    subplot(numCH,1,chnum);plot(timeWF(idx_TOF_0)*1e6,fullWFref(idx_TOF_0,chnum),'sk');hold off
     legend('FullWF','WFtoAnalyze','Arrival');
+    xlabel('Time ($\mu s$)','Interpreter','Latex');
+    ylabel('Amplitude (bits)','Interpreter','Latex');
+
+    dcmObj = datacursormode;
+    set(dcmObj,'UpdateFcn',@GoodCursor);
     set(gca,'FontSize',16);
     drawnow
 end
@@ -142,74 +162,104 @@ end
 % Compute changes in time of flight, max of intercorrelation and RmsAmp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-hh = 1;
-for ii = 1:totalnumberoffiles
-    fprintf(['File number ' num2str(ii) '.\n']) % display file number
-    ACfilename = [run_ac_path num2str(ii) '.ac'];
-    fid = fopen(ACfilename,'r');
-    ACdata = fread(fid,'int16');
-    fclose(fid);
-    
-    % reshape to get one column per channel    
-    ACdata = reshape(ACdata,[],numCH,numSFpfile); % 3D matrix with WF vs Channel vs number of SF   
-    ACdata = permute(ACdata,[1 3 2]); % put Channel as the last dimension before reshaping
-    ACdata = reshape(ACdata,[],numCH,1); % WF vs Channel
+fullWF = zeros(WFlength,numCH);
+
+ii = 1; % file number
+jj = 1; % WFnum within each file
+
+WindowShift = 0;
+
+idxBegRef = idxBeg;
+idxEndRef = idxEnd;
+
+for hh = 1:acN % from 1 to the total number of stacked waveforms
+    % stack WFs
+    for kk = 1:NtoStack        
+        if jj == 1 % if first WF of the file
+            fprintf(['File number ' num2str(ii) '.\n']) % display file number
+            ACfilename = [run_ac_path num2str(ii) '.ac'];
+            fid = fopen(ACfilename,'r');
+            ACdata = fread(fid,'int16');
+            fclose(fid);
             
-    for jj = 1:numWFpfilepCH        
-        fullWF = ACdata(WFlength*(jj-1)+1:WFlength*jj,:); % read data        
-        WF = fullWF(idxBeg:idxEnd,:); % WF is only the part to be analyzed
-      
-        for chnum = 1:numCH            
-            corr_signals = xcorr(WFref(:,chnum),WF(:,chnum),'coeff');            
-            [MaxInter(hh,chnum),TimeShift(hh,chnum)] = delay(corr_signals,ts);            
-            RmsAmp(hh,chnum) = rms(WF(:,chnum)); % RmsAmp of the waveform 
-            Amp(hh,chnum) = max(WF(:,chnum))-min(WF(:,chnum)); % Max Amp of the waveform 
-        end               
-        if (stepoptions.SHOW_allWF && ~stepoptions.SHOW_1WFperfile) || (~stepoptions.SHOW_allWF && stepoptions.SHOW_1WFperfile && jj == 1)            
-            figure(3)
-            for chnum = 1:numCH
-                subplot(numCH,1,chnum);plot(fullWFref(:,chnum),'r');hold on
-                subplot(numCH,1,chnum);plot(idxBeg:idxEnd,WFref(:,chnum),'g');grid on;
-            end                        
-            figure(3)
-            for chnum = 1:numCH
-                subplot(numCH,1,chnum);plot(fullWF(:,chnum),'b');
-                subplot(numCH,1,chnum);plot(idxBeg:idxEnd,WF(:,chnum),'k');hold off
-                drawnow
-            end            
-        end 
-        for chnum = 1:numCH
-            if strcmp(reference,'relativeref') && MaxInter(hh,chnum) >= threshold 
-                % current WF becomes reference WF for the next run if max
-                % of intercorrelation is above threshold
-                fullWFref(:,chnum) = fullWF(:,chnum);
-                WFref(:,chnum) = WF(:,chnum);
-            else % MaxInter is lower than threshold.
-                % result of cross-correlation is replaced by NaN and we
-                % don't keep the current WF as a reference for the next run
-                TimeShift(hh,chnum) = NaN; 
-                RmsAmp(hh,chnum) = NaN;
-            end
+            % reshape to get one column per channel
+            ACdata = reshape(ACdata,[],numCH,numSFpfile);   % 3D matrix with WF vs Channel vs number of SF
+            ACdata = permute(ACdata,[1 3 2]);               % put Channel as the last dimension before reshaping
+            ACdata = reshape(ACdata,[],numCH,1);            % WF vs Channel
         end
-        hh = hh + 1;
+        fullWF = fullWF + ACdata(WFlength*(jj-1)+1:WFlength*jj,:); % read data
+        
+        if jj < numWFpfilepCH   % stay within the same file for the next run
+            jj = jj + 1;
+        else                    % use next file for the next run
+            jj = 1;ii = ii + 1;
+        end
+    end
+    fullWF = fullWF/NtoStack; % stacked WF        
+    WF = fullWF(idxBeg:idxEnd,:); % WF is only the part to be analyzed
+     
+    % cross-correlate
+    for chnum = 1:numCH
+        corr_signals = xcorr(WFref(:,chnum),WF(:,chnum),'coeff');
+        [MaxInter(hh,chnum),tempTimeShift(hh,chnum)] = delay(corr_signals,ts);
+        TimeShift(hh,chnum) = tempTimeShift(hh,chnum) - WindowShift*ts;
+        RmsAmp(hh,chnum) = rms(WF(:,chnum)); % RmsAmp of the waveform
+        Amp(hh,chnum) = max(WF(:,chnum))-min(WF(:,chnum)); % Max Amp of the waveform
+    end
+    % display
+    if (stepoptions.SHOW_allWF && ~stepoptions.SHOW_1WFperfile) || (~stepoptions.SHOW_allWF && stepoptions.SHOW_1WFperfile && jj == 1)
+        figure(3)
+        for chnum = 1:numCH
+            subplot(numCH,1,chnum);plot(timeWF*1e6,fullWFref(:,chnum),'r');hold on
+            subplot(numCH,1,chnum);plot(timeWF(idxBegRef:idxEndRef)*1e6,WFref(:,chnum),'g');grid on;
+        end
+        figure(3)
+        for chnum = 1:numCH
+            subplot(numCH,1,chnum);plot(timeWF*1e6,fullWF(:,chnum),'b');
+            subplot(numCH,1,chnum);plot(timeWF(idxBeg:idxEnd)*1e6,WF(:,chnum),'k');hold off
+            drawnow
+        end
     end    
+    % shift window for the next loop
+    if strcmp(reference,'absoluteref') && abs(tempTimeShift(hh,1)) > ts %&& MaxInter(hh,1) > 0.5
+        integerShift = floor(tempTimeShift(hh,1)/ts); % first channel
+        idxBeg = idxBeg - integerShift;
+        idxEnd = idxEnd - integerShift;
+        WindowShift = WindowShift - integerShift;       
+        if idxBeg < 1 
+            error('The window has shifted too fast towards early arrivals, probably because of some noisy waveforms. Consider increasing the number of waveforms to stack to reduce noise');        
+        end
+    end    
+    % choose reference WF for the next run
+    for chnum = 1:numCH
+        if strcmp(reference,'relativeref') && MaxInter(hh,chnum) >= threshold
+            % current WF becomes reference WF for the next run if max
+            % of intercorrelation is above threshold
+            fullWFref(:,chnum) = fullWF(:,chnum);
+            WFref(:,chnum) = WF(:,chnum);
+        elseif strcmp(reference,'relativeref') && MaxInter(hh,chnum) < threshold
+            % MaxInter is lower than threshold.
+            % result of cross-correlation is replaced by NaN and we
+            % don't keep the current WF as a reference for the next run
+            TimeShift(hh,chnum) = NaN;
+            RmsAmp(hh,chnum) = NaN;
+        end
+    end           
 end
 
 % Amplitude found for first WF is always wrong. We assign it the amplitude
 % of the second WF.
-RmsAmp(1,:) = RmsAmp(2,:);
-TimeShift(1,:) = TimeShift(2,:);
-
-% sum up all time differences when using relative reference waveforms.
-% if strcmp(reference,'relativeref')    
-%     TimeShift = cumsum(TimeShift);
-% end
+if NtoStack == 1
+    RmsAmp(1,:) = RmsAmp(2,:);
+    TimeShift(1,:) = TimeShift(2,:);
+end
 
 % take the opposite such that a positive TimeShift means later arrival.
 TimeShift = -TimeShift;
 
-
 end
+
+
 
 
 
