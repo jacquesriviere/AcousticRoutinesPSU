@@ -93,8 +93,9 @@ switch acousticrun
 end  
 
 % Using step 3, show me WFs at these times
-% AtWhichTimes = [1700 2000 2500 3000]; % vector of times (seconds) at which you would like to see the waveforms
-AtWhichTimes = [1700:500:3200];
+AtWhichTimes = [1700 2000 2500 3000]; % vector of times (seconds) at which you would like to see the waveforms
+% AtWhichTimes = [1700:500:3200]; % Another example of vector to be used
+
 % choose 'absoluteref' to cross-correlate all WFs with the NtoStackref first ones. 
 % or choose 'relativeref' to cross-correlate each WF with the previous one.
 ref = 'absoluteref'; %'absoluteref';
