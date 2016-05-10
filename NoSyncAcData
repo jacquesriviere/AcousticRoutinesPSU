@@ -28,12 +28,12 @@ numWFpfilepCH = numSFpfile*numWFpSFpCH;         % number of WF per file and per 
 fs = acSettings.samplingFreq;                   % acoustic sampling rate in MHz
 clear acSettings
 
-ts = 1/fs; % sampling time in microsec                        
+ts = (1/fs)/1e6; % sampling time in sec                        
          
 acN = TotalNumberOfFiles*numWFpfilepCH; % total number of WF per channel
 
 % build acoustic time vector
-acTime = (0:acPeriod_adjusted:acPeriod_adjusted*(acN-1))/1e6; % seconds
+acTime = (0:acPeriod:acPeriod*(acN-1))/1e6; % seconds
 
 fprintf(['The acoustic time vector goes from 0 to ' num2str(acTime(end)) ' s.\n']);
 
