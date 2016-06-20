@@ -1,4 +1,4 @@
-function ShowMeWFs(Ac_path,run_ac_path,ts,acTime,AtWhichTimes,NtoStack)
+function ShowMeWFs(Ac_path,run_ac_path,ts,acTime,AtWhichTimes,NtoStack,Offset,WhichTransTomoMode)
 
 % This function is used to display waveforms at particular times during the
 % run, with the options of stacking them. It is typically used to pick
@@ -8,27 +8,48 @@ function ShowMeWFs(Ac_path,run_ac_path,ts,acTime,AtWhichTimes,NtoStack)
 % Inputs
 % Ac_path is the path where pXXXX.mat (containing acoustic settings) can be
 % loaded
+
 % run_ac_path is the path where the acoustic data can be loaded
+
 % ts is the sampling time, typically it is the output 'ts_adjusted'
 % returned by SyncAcData function
+
 % acTime is the time vector synced with mechanical data. It is typically
 % the output of SyncAcData function.
+
 % AtWhichTimes is a scalar or vector of time values at which you wish to
 % display the waveform
+
 % NtoStack is the number of waveforms to stack, centered around each value
 % of AtWhichTimes. The time range is indicated on the figure.
+
+% Offset is the number allowing one to offset waveforms corresponding to
+% different channels (put 0 if you don't want to offset waveforms)
+
+% WhichTransTomoMode: When using tomography mode (i.e. transmit first
+% emitter, record all receivers; transmit next emittor, record all
+% receivers), ShowMeWFs will display waveforms recorded when transmitter
+% "WhichTransTomoMode" was used. For instance, if transmitters 1, 2, 3 were
+% P, SV and SH, WhichTransTomoMode = 1 will display WFs from all receivers
+% when P-wave transmitter was active. If plane wave mode is used (i.e.
+% transmit all emittors, record all receivers), do not assign any input and
+% WhichTransTomoMode will be set to 1.
 
 % Outputs
 % The only output is a figure with displayed waveforms
 
-
+if nargin < 8
+    WhichTransTomoMode = 0;
+end
 
 % acoustic parameters
 acSettings = load(Ac_path);                 % load acoustic settings
 numSFpfile = acSettings.numFrames/2;        % number of superframes per file
 numWFpSFpCH = acSettings.numAcqs;           % number of WF per superframe and per channel
 numWFpfilepCH = numSFpfile*numWFpSFpCH;     % number of WF per file and per channel
-numCH = length(acSettings.channels2save);   % number of channels
+numCHR = length(acSettings.channels2save);   % number of channels
+numCHT = length(acSettings.channels2transmit);   % number of channels
+
 WFlength = acSettings.Nsamples;             % waveform length
 fs = 1/ts;                                  % acoustic sampling rate
 clear acSettings
@@ -41,6 +62,9 @@ N = length(AtWhichTimes);
 leg = zeros(N,1);
 rangeTimes = zeros(N,2);
 legendmatrix = cell(N,1);
+color = lines(N);
+hh = 1; % index for legend
+indexlegend = NaN(N,1);
 for ii = 1:N
     idxAcTime = find(acTime > AtWhichTimes(ii),1,'first');      
     idxAcTimeVec = idxAcTime-ceil(NtoStack/2)+1:idxAcTime+floor(NtoStack/2); % vector of indexes centered around 'idxAcTime'    
@@ -55,49 +79,65 @@ for ii = 1:N
     rangeTimes(ii,:) = [acTime(idxAcTimeVec(1)) acTime(idxAcTimeVec(end))];     
     
     filenumber = floor(idxAcTimeVec(1)/numWFpfilepCH); % file number for the first WF to stack
-
-    idxWFwithinfile = mod(idxAcTime,numWFpfilepCH); 
-    fullWFref = zeros(WFlength,numCH);
+    idxWFwithinfile = mod(idxAcTimeVec(1),numWFpfilepCH); % closest WF within that file (but not necessarily corresponding to the good transmitter)
+    
+    % find the waveform which corresponds to transmitter WhichTransTomoMode
+    ShiftTrans = mod(idxWFwithinfile,numCHT);
+    if ShiftTrans == 0
+        ShiftTrans = ShiftTrans + WhichTransTomoMode;    
+    end
+    idxWFwithinfile = idxWFwithinfile + (WhichTransTomoMode - ShiftTrans); % closest WF within that file corresponding to the good trnasmitter         
+    fullWFref = zeros(WFlength,numCHR);
+    
     for kk = 1:NtoStack % number of WFs to stack                                
         
-        if idxWFwithinfile == 1 || kk == 1 % open new file if idxWFwithinfile is 1 or if it's the first WF to stack
+        if idxWFwithinfile <= numCHT || kk == 1 % open new file if idxWFwithinfile is 1 or if it's the first WF to stack
             ACfilename = [run_ac_path num2str(filenumber) '.ac']; % only the first file is needed to extract the first 50 WF
             fid = fopen(ACfilename,'r');
             ACdata = fread(fid,'int16');
             fclose(fid);
             
             % reshape to get one column per channel
-            ACdata = reshape(ACdata,[],numCH,numSFpfile); % 3D matrix with WF vs Channel vs number of SF
+            ACdata = reshape(ACdata,[],numCHR,numSFpfile); % 3D matrix with WF vs Channel vs number of SF
             ACdata = permute(ACdata,[1 3 2]); % put Channel as the last dimension before reshaping
-            ACdata = reshape(ACdata,[],numCH,1); % WF vs Channel
+            ACdata = reshape(ACdata,[],numCHR,1); % WF vs Channel
         end
         
         fullWFref = fullWFref + ACdata(WFlength*(idxWFwithinfile-1)+1:WFlength*idxWFwithinfile,:); % stack WFs
-        if idxWFwithinfile < numWFpfilepCH  % stay within the same file for the next loop
-            idxWFwithinfile = idxWFwithinfile + 1;
+        if idxWFwithinfile <= numWFpfilepCH - numCHT % stay within the same file for the next loop
+            idxWFwithinfile = idxWFwithinfile + numCHT; % update to the next WF corresponding to the same transmitter 
         else                                % use next file for the next loop
-            idxWFwithinfile = 1;filenumber = filenumber + 1;
+            filenumber = filenumber + 1; % go to next file
+            idxWFwithinfile = WhichTransTomoMode; % start in the next file at WFs corresponding to transmitter "WhichTransTomoMode"
         end        
     end   
-    fullWFref = fullWFref/NtoStack;
-    if ii == 1 % create new figure the first time only
+    fullWFref = fullWFref/NtoStack;    
+    if ii == 1 % create new figure the first time only        
         figure;
     end
-    for chnum = 1:numCH
-        subplot(numCH,1,chnum);
-        leg(ii) = plot(timeWF*1e6,fullWFref(:,chnum));hold on;grid on
-        ylabel('Amplitude (bits)','Interpreter','Latex');
+    indexlegend(ii) = hh;
+    for chnum = 1:numCHR
+%         subplot(numCHR,1,chnum);
+        leg(hh) = plot(timeWF,fullWFref(:,chnum)-Offset*(chnum-1),'linewidth',2,'col',color(ii,:));hold on;grid on
+%         ylabel('Amplitude (bits)','Interpreter','Latex');
         set(gca,'FontSize',16);
+        set(gca,'YTickLabel',[])
         dcmObj = datacursormode;
         set(dcmObj,'UpdateFcn',@GoodCursor);
-        drawnow
+        drawnow        
+        hh = hh + 1; % index for legend        
     end
     xlabel('Time ($\mu s$)','Interpreter','Latex'); 
+    title(['Transmitter ' num2str(WhichTransTomoMode)])
     legendmatrix{ii}=['Stacked over time range ' num2str(rangeTimes(ii,1),'%.2f') '-' num2str(rangeTimes(ii,2),'%.2f') ' s.'];
 end
-legend(legendmatrix)
-
+% display legend for one channel only
+legend(leg(indexlegend),legendmatrix)
 end
+
+
+
+
 
 
 
