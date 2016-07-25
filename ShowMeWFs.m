@@ -50,6 +50,10 @@ numWFpfilepCH = numSFpfile*numWFpSFpCH;     % number of WF per file and per chan
 numCHR = length(acSettings.channels2save);   % number of channels
 numCHT = length(acSettings.channels2transmit);   % number of channels
 
+if WhichTransTomoMode > numCHT
+    error(['You chose to display transmitter #' num2str(WhichTransTomoMode) '. Please choose a transmitter between 1 and ' num2str(numCHT) '.']);
+end
+
 WFlength = acSettings.Nsamples;             % waveform length
 fs = 1/ts;                                  % acoustic sampling rate
 clear acSettings
@@ -78,13 +82,13 @@ for ii = 1:N
     
     rangeTimes(ii,:) = [acTime(idxAcTimeVec(1)) acTime(idxAcTimeVec(end))];     
     
-    filenumber = floor(idxAcTimeVec(1)/numWFpfilepCH); % file number for the first WF to stack
+    filenumber = ceil(idxAcTimeVec(1)/numWFpfilepCH); % file number for the first WF to stack
     idxWFwithinfile = mod(idxAcTimeVec(1),numWFpfilepCH); % closest WF within that file (but not necessarily corresponding to the good transmitter)
     
     % find the waveform which corresponds to transmitter WhichTransTomoMode
     ShiftTrans = mod(idxWFwithinfile,numCHT);
     if ShiftTrans == 0
-        ShiftTrans = ShiftTrans + WhichTransTomoMode;    
+        ShiftTrans = numCHT;  % i.e. no shift 
     end
     idxWFwithinfile = idxWFwithinfile + (WhichTransTomoMode - ShiftTrans); % closest WF within that file corresponding to the good trnasmitter         
     fullWFref = zeros(WFlength,numCHR);
@@ -134,9 +138,6 @@ end
 % display legend for one channel only
 legend(leg(indexlegend),legendmatrix)
 end
-
-
-
 
 
 
