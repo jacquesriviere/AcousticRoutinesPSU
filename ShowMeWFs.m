@@ -1,21 +1,19 @@
-function ShowMeWFs(Ac_path,run_ac_path,ts,acTime,AtWhichTimes,NtoStack,Offset,WhichTransTomoMode)
+function ShowMeWFs(WF_path,AcSettingsfile,SyncFile,AtWhichTimes,NtoStack,Offset,WhichTransTomoMode)
 
 % This function is used to display waveforms at particular times during the
 % run, with the options of stacking them. It is typically used to pick
 % arrival times by hand, or decide how many waveforms need to be stacked
-% before further processing (cross-correlation and so on)
+% before further processing
 
 % Inputs
-% Ac_path is the path where pXXXX.mat (containing acoustic settings) can be
-% loaded
 
-% run_ac_path is the path where the acoustic data can be loaded
+% WF_path is the path where the acoustic data can be loaded
 
-% ts is the sampling time, typically it is the output 'ts_adjusted'
-% returned by SyncAcData function
+% AcSettingsfile is the name of the file containing the acoustic settings
+% chosen when recording on Verasonics
 
-% acTime is the time vector synced with mechanical data. It is typically
-% the output of SyncAcData function.
+% SyncFile is the result of the pXXXX_sa routine, providing the acTime vector
+% and the adjusted sampling time ts returned by SyncAcData function
 
 % AtWhichTimes is a scalar or vector of time values at which you wish to
 % display the waveform
@@ -38,19 +36,21 @@ function ShowMeWFs(Ac_path,run_ac_path,ts,acTime,AtWhichTimes,NtoStack,Offset,Wh
 % Outputs
 % The only output is a figure with displayed waveforms
 
-if nargin < 8
-    WhichTransTomoMode = 0;
+if nargin < 7
+    WhichTransTomoMode = 1;
 end
 
 % acoustic parameters
-acSettings = load(Ac_path);                 % load acoustic settings
+acSettings = load(AcSettingsfile);          % load acoustic settings
 numSFpfile = acSettings.numFrames/2;        % number of superframes per file
 numWFpSFpCH = acSettings.numAcqs;           % number of WF per superframe and per channel
 numWFpfilepCH = numSFpfile*numWFpSFpCH;     % number of WF per file and per channel
 numCHR = length(acSettings.channels2save);   % number of channels
 numCHT = length(acSettings.channels2transmit);   % number of channels
 
-if WhichTransTomoMode > numCHT
+load(SyncFile); % load sync data
+
+if WhichTransTomoMode > numCHT    
     error(['You chose to display transmitter #' num2str(WhichTransTomoMode) '. Please choose a transmitter between 1 and ' num2str(numCHT) '.']);
 end
 
@@ -96,15 +96,7 @@ for ii = 1:N
     for kk = 1:NtoStack % number of WFs to stack                                
         
         if idxWFwithinfile <= numCHT || kk == 1 % open new file if idxWFwithinfile is 1 or if it's the first WF to stack
-            ACfilename = [run_ac_path num2str(filenumber) '.ac']; % only the first file is needed to extract the first 50 WF
-            fid = fopen(ACfilename,'r');
-            ACdata = fread(fid,'int16');
-            fclose(fid);
-            
-            % reshape to get one column per channel
-            ACdata = reshape(ACdata,[],numCHR,numSFpfile); % 3D matrix with WF vs Channel vs number of SF
-            ACdata = permute(ACdata,[1 3 2]); % put Channel as the last dimension before reshaping
-            ACdata = reshape(ACdata,[],numCHR,1); % WF vs Channel
+            ACdata = LoadAcFile(WF_path,filenumber,numCHR,numSFpfile);
         end
         
         fullWFref = fullWFref + ACdata(WFlength*(idxWFwithinfile-1)+1:WFlength*idxWFwithinfile,:); % stack WFs
@@ -138,7 +130,6 @@ end
 % display legend for one channel only
 legend(leg(indexlegend),legendmatrix)
 end
-
 
 
 
