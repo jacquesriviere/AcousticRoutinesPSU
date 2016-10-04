@@ -1,4 +1,4 @@
-function [acTime,acRate_adjusted,ts_adjusted,TotalNumberOfFiles] = SyncAcData(Ac_path,Time,Sync,idxft,idxlt,idxref1,idxref2)
+function [acTime,acPeriod_adjusted,ts_adjusted,TotalNumberOfFiles] = SyncAcData(AcSettingsfile,Time,Sync,idxft,idxlt,idxref1,idxref2)
 % SyncAcData uses acoustic settings (mat file from Verasonics) and indexes
 % provided by user to sync mechanical and acoustical data. It accounts for
 % small variations in sampling frequency/period (of the order of
@@ -10,7 +10,7 @@ function [acTime,acRate_adjusted,ts_adjusted,TotalNumberOfFiles] = SyncAcData(Ac
 % adjusted acoustic sampling rate and an adjusted acoustic pulsing rate.
 
 % INPUTS
-% Ac_path is the path where pXXXX.mat (containing acoustic settings) can be
+% AcSettingsfile is the path where pXXXX.mat (containing acoustic settings) can be
 % loaded
 % Time is the time vector from biax data
 % Sync is the time vector from biax data
@@ -21,12 +21,12 @@ function [acTime,acRate_adjusted,ts_adjusted,TotalNumberOfFiles] = SyncAcData(Ac
 
 % OUTPUTS
 % acTime is the time vector for acoustic data obtained after synchronization
-% acRate_adjusted is the rate at which acoustic pulses are sent (found after adjusting using biax recorder as a reference)
+% acPeriod_adjusted is the time between two consecutive acoustic pulses in microsec (found after adjusting using biax recorder as a reference)
 % ts_adjusted is the sampling period in microsec (i.e. 1/fs) found after adjusting using biax recorder as a reference
 % TotalNumberOfFiles is the total number of acoustic files to be analyzed 
 
 % acoustic parameters
-acSettings = load(Ac_path);                     % load acoustic settings
+acSettings = load(AcSettingsfile);                     % load acoustic settings
 acPeriod = acSettings.SeqControl(1).argument;   % time btw pulses in microsec (SeqControl(1).argument = timeBetweenpulses)
 acRate = 1e6/(acPeriod);                        % in Hz (number of WF per second)
 numSFpfile = acSettings.numFrames/2;            % number of superframes per file
@@ -139,9 +139,8 @@ ylabel('Time between consecutive triggers (ms)')
 legend('Expected','Adjusted (using biax recorder as reference)')
 set(gca,'FontSize',14);
 fprintf(['Check that the time between consecutive triggers is constant,\n' ...
-             'then zoom on the other figure to check that the sync is correct.\n' ...
-             'If yes, run the program again with step 3.\n\n'])                          
-         
+             'then zoom on the other figure to check that the sync is correct.\n\n'])                          
+
 acN = TotalNumberOfFiles*numWFpfilepCH; % total number of WF per channel
 
 % build acoustic time vector
@@ -156,6 +155,7 @@ acTime = acTime + trigger_time(1);                            % seconds
 % dcmObj = datacursormode;
 % set(dcmObj,'UpdateFcn',@GoodCursor); 
 
-
 end
+
+
 
