@@ -336,8 +336,7 @@ if strcmp(reference,'mixref') && exist('changeref','var')
     for chnumt = 1:numCHT
         for chnumr = 1:numCHR
             chrefname = ['R' num2str(chnumr) 'T' num2str(chnumt)];            
-            % test if the reference was changed for this pair of T & R)
-            if exist('changeref.(chrefname)','var')
+            if isfield(changeref,(chrefname)) % test if the ref was changed for this pair of T & R
                 kk = 1;
                 for gh = changeref.(chrefname)
                     if gh == changeref.(chrefname)(end) % if last index, correct until the end
