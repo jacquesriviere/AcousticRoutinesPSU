@@ -120,17 +120,17 @@ fullWFref = zeros(WFlength,numCHR,numCHT);
 RmsAmpRef = zeros(numCHR,numCHT);
 AmpRef = zeros(numCHR,numCHT);
 
-filterparam = fir1(256,2*ts*2,'low'); % low pass filter @2MHz (ts is in microsec)
+% filterparam = fir1(256,2*ts*2,'low'); % low pass filter @2MHz (ts is in microsec)
 
 %% build a reference waveform
 
 % if 'absref' is chosen, all waveforms in the time range are stacked
 % to build a template
 
-% if 'relref' is chosen, this reference WF will be used only once to
+% if 'relref' or 'mixref' is chosen, this reference WF will be used only once to
 % be compared with the next one
 
-kk = 0; % from 0 to NtoStack*numCHT - 1 for relative reference or from 0 to acN*numCHT - 1 
+kk = 0; % from 0 to NtoStack*numCHT - 1 for relref and mixref or from 0 to acN*numCHT - 1 fr absref 
 ii = filenumber1; % file number
 jj = idxWFwithinfile1; % from 1 to numWFpfilepCH 
 chnumt = 1; % transmitter index
@@ -167,7 +167,7 @@ end
 WFref = fullWFref(idxBeg:idxEnd,:,:); % part of the WF to be analyzed
 
 % figure(765);plot(WFref(:,:,1));hold on; % uncomment to display the effect of filtering
-WFref = filtfilt(filterparam,1,WFref);
+% WFref = filtfilt(filterparam,1,WFref);
 % plot(fWFref(:,:,1));hold off;pause % uncomment to display the effect of filtering
 
 for chnumr = 1:numCHR
@@ -248,7 +248,7 @@ for hh = 1:acN % from 1 to the total number of stacked waveforms
     
     WF = fullWF(idxBeg:idxEnd,:,:); % WF is only the part to be analyzed    
     % figure(765);plot(WF(:,:,1));hold on; % uncomment to display the effect of filtering
-    WF = filtfilt(filterparam,1,WF);
+%     WF = filtfilt(filterparam,1,WF);
     % plot(WF(:,:,1),'k');hold off;pause % uncomment to display the effect of filtering
     
     % cross-correlate (time delay)
@@ -273,9 +273,9 @@ for hh = 1:acN % from 1 to the total number of stacked waveforms
         for chnumt = 1:numCHT
             for chnumr = 1:numCHR                 
                 h1(chnumr,chnumt) = plot(timeWF,fullWFref(:,chnumr,chnumt)-Offset*(idxoffset-1),'r');hold on                
-                h2(chnumr,chnumt) = plot(timeWF(idxBeg:idxEnd),WFref(:,chnumr,chnumt)-Offset*(idxoffset-1),'g');%hold on;                
+                h2(chnumr,chnumt) = plot(timeWF(idxBeg:idxEnd),WFref(:,chnumr,chnumt)-Offset*(idxoffset-1),'g'); %hold on;                
                 h3(chnumr,chnumt) = plot(timeWF,fullWF(:,chnumr,chnumt)-Offset*(idxoffset-1),'b');
-                h4(chnumr,chnumt) = plot(timeWF(idxBeg:idxEnd),WF(:,chnumr,chnumt)-Offset*(idxoffset-1),'k');%hold on
+                h4(chnumr,chnumt) = plot(timeWF(idxBeg:idxEnd),WF(:,chnumr,chnumt)-Offset*(idxoffset-1),'k'); %hold on
                 drawnow
                 idxoffset = idxoffset + 1; %pause         
             end
@@ -332,24 +332,26 @@ if strcmp(reference,'relref')
     TimeShift(idxNaN) = NaN;
 end
 % adjust TimeShift based on when the reference has changed (mixref options)
-if strcmp(reference,'mixref')
+if strcmp(reference,'mixref') && exist('changeref','var')
     for chnumt = 1:numCHT
         for chnumr = 1:numCHR
-            chrefname = ['R' num2str(chnumr) 'T' num2str(chnumt)];
-            kk = 1;
-            for gh = changeref.(chrefname)
-                if gh == changeref.(chrefname)(end) % if last index, correct until the end
-                    upbound = length(TimeShift(:,chnumr,chnumt));
-                else
-                    upbound = changeref.(chrefname)(kk+1); % correct until next reference
+            chrefname = ['R' num2str(chnumr) 'T' num2str(chnumt)];            
+            % test if the reference was changed for this pair of T & R)
+            if exist('changeref.(chrefname)','var')
+                kk = 1;
+                for gh = changeref.(chrefname)
+                    if gh == changeref.(chrefname)(end) % if last index, correct until the end
+                        upbound = length(TimeShift(:,chnumr,chnumt));
+                    else
+                        upbound = changeref.(chrefname)(kk+1); % correct until next reference
+                    end
+                    TimeShift(gh+1:upbound,chnumr,chnumt) = TimeShift(gh+1:upbound,chnumr,chnumt) + TimeShift(gh,chnumr,chnumt);
+                    kk = kk + 1;
                 end
-                TimeShift(gh+1:upbound,chnumr,chnumt) = TimeShift(gh+1:upbound,chnumr,chnumt) + TimeShift(gh,chnumr,chnumt);
-                kk = kk + 1;
             end
         end
     end
 end
 
 end
-
 
