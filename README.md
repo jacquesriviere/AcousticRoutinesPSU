@@ -4,4 +4,4 @@ Step 1: Write a script pXXXX_sa similar to p4640_sa to synchronize the acoustic 
 
 Step 2: Write a script pXXXX_a similar to p4640_a to display waveforms (ShowMeWFs function) and retrieves TimeShift, Amplitudes, etc (ProcessAc_Tomo). 
 
-
+Step 3: Depending on your experiment, you might want to use different options to compute the cross-correlation and retrieve TimeShift. Look at p4640_comparison_abs_rel_mix.m as an example.
