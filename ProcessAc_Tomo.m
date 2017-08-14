@@ -120,7 +120,8 @@ fullWFref = zeros(WFlength,numCHR,numCHT);
 RmsAmpRef = zeros(numCHR,numCHT);
 AmpRef = zeros(numCHR,numCHT);
 
-% filterparam = fir1(256,2*ts*2,'low'); % low pass filter @2MHz (ts is in microsec)
+% filter to be used if noisy waveforms (adjust order and frequencies as needed)
+filterparam = fir1(256,[0.25 2]*ts*2); % pass band filter 0.25MHz 2MHz (ts is in microsec)
 
 %% build a reference waveform
 
@@ -164,11 +165,11 @@ elseif strcmp(reference,'absref')
     fullWFref = fullWFref/acN/NtoStack; % average
 end
 
-WFref = fullWFref(idxBeg:idxEnd,:,:); % part of the WF to be analyzed
+% figure(765);plot(fullWFref(:,1,1));hold on; % uncomment to display the effect of filtering
+% fullWFref = filtfilt(filterparam,1,fullWFref); % filtering
+% plot(fullWFref(:,1,1),'k');hold off;pause % uncomment to display the effect of filtering
 
-% figure(765);plot(WFref(:,:,1));hold on; % uncomment to display the effect of filtering
-% WFref = filtfilt(filterparam,1,WFref);
-% plot(fWFref(:,:,1));hold off;pause % uncomment to display the effect of filtering
+WFref = fullWFref(idxBeg:idxEnd,:,:); % part of the WF to be analyzed
 
 for chnumr = 1:numCHR
     RmsAmpRef(chnumr,:) = rms(WFref(:,chnumr,:)); % RmsAmp of the reference waveform
@@ -244,12 +245,13 @@ for hh = 1:acN % from 1 to the total number of stacked waveforms
             jj = 1;ii = ii + 1;
         end
     end
-    fullWF = fullWF/NtoStack; % stacked WF   
+    fullWF = fullWF/NtoStack; % stacked WF  
+    
+%     figure(765);plot(fullWF(:,1,1));hold on; % uncomment to display the effect of filtering    
+%     fullWF = filtfilt(filterparam,1,fullWF); % filtering    
+%     plot(fullWF(:,1,1),'k');hold off;pause % uncomment to display the effect of filtering
     
     WF = fullWF(idxBeg:idxEnd,:,:); % WF is only the part to be analyzed    
-    % figure(765);plot(WF(:,:,1));hold on; % uncomment to display the effect of filtering
-%     WF = filtfilt(filterparam,1,WF);
-    % plot(WF(:,:,1),'k');hold off;pause % uncomment to display the effect of filtering
     
     % cross-correlate (time delay)
     for chnumt = 1:numCHT
@@ -335,8 +337,8 @@ end
 if strcmp(reference,'mixref') && exist('changeref','var')
     for chnumt = 1:numCHT
         for chnumr = 1:numCHR
-            chrefname = ['R' num2str(chnumr) 'T' num2str(chnumt)];            
-            if isfield(changeref,(chrefname)) % test if the ref was changed for this pair of T & R
+            chrefname = ['R' num2str(chnumr) 'T' num2str(chnumt)];                        
+            if isfield(changeref,(chrefname)) % test if the ref was changed for this pair of T & R            
                 kk = 1;
                 for gh = changeref.(chrefname)
                     if gh == changeref.(chrefname)(end) % if last index, correct until the end
