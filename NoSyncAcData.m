@@ -1,9 +1,8 @@
 function [acTime,acPeriod,ts] = NoSyncAcData(Ac_path,TotalNumberOfFiles)
 % NoSyncAcData uses acoustic settings (mat file from Verasonics) and the
 % number of files provided by user to create a time vector starting at t =
-% 0 and having one datapoint per waveform. This function is used when
+% 0 and having one datapoint per waveform. This function is used instead of SyncAcData when
 % acoustic data is not synchronized with any other data (e.g. biax data).
-% It replaces SyncAcData.
 
 % The main output is a time vector for acoustic data. It also outputs an
 % adjusted acoustic sampling rate and an adjusted acoustic pulsing rate.
