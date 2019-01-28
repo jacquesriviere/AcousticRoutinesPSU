@@ -29,11 +29,15 @@ elseif x3 == length(X) + 1 % if the maximum happens to be at the very last point
     x2 = length(X) - 1; 
     x3 = length(X);
     ind = length(X) - 1; 
-else    
-    y1 = X(x1);
-    y2 = X(x2);
-    y3 = X(x3);
-end
+end    
+
+% Loop from lines 22 - 32 do not assign y1...y3 to anything. So, if the lines 35 - 37 are inside the else portion, they aren't
+% created when x1 == 0 or x3 == length(X) + 1. This causes an error when line 41 is compiled.
+
+y1 = X(x1);
+y2 = X(x2);
+y3 = X(x3);
+
 
 b = ((y1 - y3)*(x1^2 - x2^2) - (y1 - y2)*(x1^2 - x3^2))/...
     ((x1 - x3)*(x1^2 - x2^2) - (x1 - x2)*(x1^2 - x3^2));
