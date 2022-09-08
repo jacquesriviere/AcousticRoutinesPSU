@@ -24,11 +24,19 @@ if x1 == 0 % if the maximum happens to be at the very first point (if you have a
     x2 = 2; 
     x3 = 3;
     ind = 2;
+    
+    y1 = X(x1);
+    y2 = X(x2);
+    y3 = X(x3);
 elseif x3 == length(X) + 1 % if the maximum happens to be at the very last point (if you have a noisy waveform and you are very unlucky for instance)
     x1 = length(X) - 2; % arbitrarily choose the maximum at x2 = length(X) - 1;
     x2 = length(X) - 1; 
     x3 = length(X);
     ind = length(X) - 1; 
+
+    y1 = X(x1);
+    y2 = X(x2);
+    y3 = X(x3);
 else    
     y1 = X(x1);
     y2 = X(x2);
