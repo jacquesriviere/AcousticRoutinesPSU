@@ -43,7 +43,7 @@ AMP = MAX-MIN;
 Sync(idxft:idxlt) = (Sync(idxft:idxlt) - mean(Sync(idxft:idxlt)))/AMP;
 Sync(idxft:idxlt) = Sync(idxft:idxlt) - max(Sync(idxft:idxlt));
 
-figure;
+HS = figure;
 plot(Time(idxft:idxlt),Sync(idxft:idxlt));hold on
 xlabel('Time (s)');ylabel('Normalized Sync');
 dcmObj = datacursormode;set(dcmObj,'UpdateFcn',@GoodCursor);
@@ -111,7 +111,7 @@ trigsraw = -0.5*ones(Ntriggerraw,1); % -0.5 to be adjusted depending on the expe
 trigs = -0.51*ones(Ntrigger,1); 
 
 % plot raw and adjusted sync, as well as the two reference triggers
-figure(2)
+figure(HS)
 plot(gca,trigger_timeraw,trigsraw,'*');
 plot(gca,trigger_time,trigs,'*');
 plot(gca,Time(idxref1),-0.52,'s');
